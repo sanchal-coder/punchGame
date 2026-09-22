@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Punch It!</title>
+<style>
+  :root {
+    --bg-top: #1a1030;
+    --bg-bot: #0a0612;
+    --panel: rgba(255,255,255,0.08);
+    --panel-border: rgba(255,255,255,0.14);
+    --text: #f5f3ff;
+    --muted: #b9b3cf;
+    --accent: #ff4d6d;
+    --accent2: #ffd23f;
+    --accent3: #4dd4ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg-top: #e9e4ff;
+      --bg-bot: #cfc5ff;
+      --panel: rgba(255,255,255,0.55);
+      --panel-border: rgba(0,0,0,0.08);
+      --text: #211a3a;
+      --muted: #5c5480;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg-top: #1a1030;
+    --bg-bot: #0a0612;
+    --panel: rgba(255,255,255,0.08);
+    --panel-border: rgba(255,255,255,0.14);
+    --text: #f5f3ff;
+    --muted: #b9b3cf;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body {
+    background: radial-gradient(ellipse at 50% -10%, var(--bg-top), var(--bg-bot) 70%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    width: 100%;
+    height: 100%;
+  }
+  #stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+
+  #hud {
+    position: absolute;
+    top: env(safe-area-inset-top, 0px);
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 16px;
+    pointer-events: none;
+    gap: 10px;
+  }
+  .stat-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 14px;
+    padding: 8px 12px;
+    min-width: 64px;
+    text-align: center;
+  }
+  .chip .label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .chip .value {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  #comboChip .value { color: var(--accent2); }
+  #comboChip.hot .value { color: var(--accent); }
+
+  #powerWrap {
+    width: 120px;
+  }
+  #powerBar {
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.15);
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  #powerFill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent3), var(--accent2), var(--accent));
+    border-radius: 6px;
+    transition: width 60ms linear;
+  }
+
+  #controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  .btn {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.96); }
+  #fileInput { display: none; }
+
+  #intro {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  #intro .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px;
+    padding: 22px 26px;
+    max-width: 320px;
+  }
+  #intro h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+  }
+  #intro p {
+    margin: 4px 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  #intro .emoji { font-size: 40px; margin-bottom: 6px; }
+
+  #hitText {
+    position: absolute;
+    font-weight: 800;
+    font-size: 22px;
+    pointer-events: none;
+    color: var(--accent2);
+    text-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="stat-group">
+      <div class="chip"><div class="label">Score</div><div class="value" id="scoreVal">0</div></div>
+      <div class="chip" id="comboChip"><div class="label">Combo</div><div class="value" id="comboVal">0</div></div>
+      <div class="chip" id="powerWrap"><div class="label">Power</div><div id="powerBar"><div id="powerFill"></div></div></div>
+    </div>
+    <div id="controls">
+      <button class="btn" id="uploadBtn">📷 Use my photo</button>
+      <button class="btn" id="resetBtn">↺ Reset</button>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+  </div>
+
+  <div id="intro">
+    <div class="card">
+      <div class="emoji">🥊</div>
+      <h1>Punch It!</h1>
+      <p>Swipe or click through the bag to throw punches — the harder and faster you swipe, the harder it hits.</p>
+      <p>Tap <b>Use my photo</b> to put your own picture on the bag.</p>
+      <p style="opacity:0.7;">(tap anywhere to start)</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- setup ----------
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const intro = document.getElementById('intro');
+  const scoreVal = document.getElementById('scoreVal');
+  const comboVal = document.getElementById('comboVal');
+  const comboChip = document.getElementById('comboChip');
+  const powerFill = document.getElementById('powerFill');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const fileInput = document.getElementById('fileInput');
+
+  let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+  let W = 0, H = 0;
+
+  function resize(){
+    const rect = stage.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    setupRope();
+  }
+
+  // ---------- physics state ----------
+  const GRAVITY = 900;          // px/s^2 (soft, for taut-chain feel)
+  const DAMPING = 0.985;        // velocity retention per integration step
+  const CONSTRAINT_ITERS = 6;
+  const NUM_SEGMENTS = 9;
+
+  let anchor = {x:0, y:0};
+  let segLength = 0;
+  let points = [];              // verlet points, points[last] is bag center
+  let bagRadius = 60;
+
+  let bagRotation = 0;
+  let bagScaleX = 1, bagScaleY = 1; // squash/stretch, springs back to 1
+
+  function setupRope(){
+    anchor.x = W/2;
+    anchor.y = Math.max(40, H*0.08);
+    const ropeLen = Math.min(H*0.42, 340);
+    segLength = ropeLen / NUM_SEGMENTS;
+    bagRadius = Math.max(46, Math.min(W,H) * 0.13);
+
+    points = [];
+    for(let i=0;i<=NUM_SEGMENTS;i++){
+      const y = anchor.y + segLength*i;
+      points.push({x: anchor.x, y: y, oldx: anchor.x, oldy: y});
+    }
+  }
+
+  function bagPoint(){ return points[points.length-1]; }
+  function prevPoint(){ return points[points.length-2]; }
+
+  function integrate(dt){
+    for(let i=1;i<points.length;i++){
+      const p = points[i];
+      const vx = (p.x - p.oldx) * DAMPING;
+      const vy = (p.y - p.oldy) * DAMPING;
+      p.oldx = p.x; p.oldy = p.y;
+      p.x += vx;
+      p.y += vy + GRAVITY * dt * dt;
+    }
+    points[0].x = anchor.x; points[0].y = anchor.y;
+    points[0].oldx = anchor.x; points[0].oldy = anchor.y;
+  }
+
+  function satisfyConstraints(){
+    for(let iter=0; iter<CONSTRAINT_ITERS; iter++){
+      for(let i=0;i<points.length-1;i++){
+        const a = points[i], b = points[i+1];
+        let dx = b.x-a.x, dy = b.y-a.y;
+        let dist = Math.sqrt(dx*dx+dy*dy);
+        if(dist < 0.0001) dist = 0.0001;
+        const diff = (dist - segLength)/dist;
+        const offX = dx*diff, offY = dy*diff;
+        if(i===0){
+          b.x -= offX; b.y -= offY;
+        } else {
+          a.x += offX*0.5; a.y += offY*0.5;
+          b.x -= offX*0.5; b.y -= offY*0.5;
+        }
+      }
+      points[0].x = anchor.x; points[0].y = anchor.y;
+      // keep the bag from swinging above the anchor's height minus a bit (soft floor for realism)
+    }
+  }
+
+  function applyImpulse(px, py, ivx, ivy){
+    const bag = bagPoint();
+    bag.oldx -= ivx;
+    bag.oldy -= ivy;
+    // bleed a bit of impulse into the last link for a whip effect
+    const link = prevPoint();
+    link.oldx -= ivx*0.25;
+    link.oldy -= ivy*0.25;
+  }
+
+  // ---------- input / punch detection ----------
+  let pointerDown = false;
+  let curX=0, curY=0, prevFrameX=0, prevFrameY=0;
+  let downX=0, downY=0, downT=0;
+  let lastPunchT = 0;
+  const PUNCH_COOLDOWN = 110; // ms
+  const SPEED_THRESHOLD = 6;  // px/frame-ish to count as a swipe punch
+
+  function toLocal(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    return {x: clientX-rect.left, y: clientY-rect.top};
+  }
+
+  function onPointerDown(e){
+    hideIntro();
+    const p = toLocal(e.clientX, e.clientY);
+    pointerDown = true;
+    curX = prevFrameX = downX = p.x;
+    curY = prevFrameY = downY = p.y;
+    downT = performance.now();
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+  }
+  function onPointerMove(e){
+    if(!pointerDown) return;
+    const p = toLocal(e.clientX, e.clientY);
+    curX = p.x; curY = p.y;
+  }
+  function onPointerUp(e){
+    if(!pointerDown) return;
+    pointerDown = false;
+    const p = toLocal(e.clientX, e.clientY);
+    const dt = Math.max(1, performance.now()-downT);
+    const dx = p.x-downX, dy = p.y-downY;
+    const dist = Math.hypot(dx,dy);
+    // a quick tap/click inside the bag = a jab, even with little movement
+    const bag = bagPoint();
+    const distToBag = Math.hypot(p.x-bag.x, p.y-bag.y);
+    if(dist < 14 && distToBag < bagRadius*1.4){
+      const now = performance.now();
+      if(now - lastPunchT > PUNCH_COOLDOWN){
+        const dirx = (p.x - bag.x) || (Math.random()-0.5);
+        const diry = (p.y - bag.y) || -1;
+        const len = Math.hypot(dirx,diry) || 1;
+        registerPunch(p.x, p.y, (dirx/len)*10, (diry/len)*10, 10);
+      }
+    }
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  function hideIntro(){
+    if(intro.style.display !== 'none'){
+      intro.style.opacity = '0';
+      setTimeout(()=>{ intro.style.display='none'; }, 500);
+    }
+  }
+
+  // ---------- scoring / juice ----------
+  let score = 0, combo = 0, bestCombo = 0, comboTimer = 0;
+  const COMBO_WINDOW = 900; // ms
+  let shake = 0;
+  let particles = [];
+  let hitTexts = [];
+  let currentPower = 0;
+
+  function registerPunch(px, py, ivx, ivy, speedMag){
+    lastPunchT = performance.now();
+    applyImpulse(px, py, ivx, ivy);
+
+    const power = Math.min(100, speedMag*3.2);
+    currentPower = power;
+    shake = Math.min(18, shake + power*0.14);
+
+    // combo logic
+    if(performance.now() - (comboTimer||0) < COMBO_WINDOW){
+      combo += 1;
+    } else {
+      combo = 1;
+    }
+    comboTimer = performance.now();
+    bestCombo = Math.max(bestCombo, combo);
+
+    const gained = Math.round(10 + power*0.6) * Math.max(1, Math.floor(combo/3)+1);
+    score += gained;
+    scoreVal.textContent = score;
+    comboVal.textContent = combo;
+    comboChip.classList.toggle('hot', combo >= 5);
+
+    spawnParticles(px, py, power);
+    spawnHitText(px, py, power);
+    bagScaleX = 1 - Math.min(0.28, power*0.0028);
+    bagScaleY = 1 + Math.min(0.28, power*0.0028);
+
+    if(navigator.vibrate){
+      try{ navigator.vibrate(Math.min(40, 10 + power*0.25)); }catch(err){}
+    }
+    playThwack(power);
+  }
+
+  function spawnParticles(x,y,power){
+    const n = Math.round(6 + power/8);
+    for(let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = 2 + Math.random()*(3+power*0.05);
+      particles.push({
+        x, y,
+        vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+        life: 1, decay: 0.02+Math.random()*0.02,
+        size: 2+Math.random()*3,
+        hue: 30 + Math.random()*30
+      });
+    }
+  }
+
+  function spawnHitText(x,y,power){
+    const labels = power>80 ? ['KO!!','SMASH!','BOOM!'] : power>45 ? ['POW!','BAM!','HIT!'] : ['jab','tap','poke'];
+    const t = labels[Math.floor(Math.random()*labels.length)];
+    hitTexts.push({x, y: y-10, text: t, life: 1, vy: -1.2 - power*0.01});
+  }
+
+  // tiny synthesized punch sound, no external assets
+  let audioCtx = null;
+  function playThwack(power){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * 0.12;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0;i<bufferSize;i++){
+        data[i] = (Math.random()*2-1) * Math.pow(1 - i/bufferSize, 2.2);
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 300 + power*15;
+      const gain = audioCtx.createGain();
+      gain.gain.value = Math.min(0.5, 0.18 + power*0.003);
+      noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      noise.start(t0);
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(120 + power*0.6, t0);
+      osc.frequency.exponentialRampToValueAtTime(40, t0+0.09);
+      const og = audioCtx.createGain();
+      og.gain.setValueAtTime(Math.min(0.35, 0.12+power*0.002), t0);
+      og.gain.exponentialRampToValueAtTime(0.001, t0+0.12);
+      osc.connect(og); og.connect(audioCtx.destination);
+      osc.start(t0); osc.stop(t0+0.13);
+    }catch(err){ /* audio not available, ignore */ }
+  }
+
+  // ---------- photo on bag ----------
+  let bagImage = null;
+  uploadBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      const img = new Image();
+      img.onload = function(){ bagImage = img; };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    setupRope();
+    score = 0; combo = 0; bestCombo = 0;
+    scoreVal.textContent = '0'; comboVal.textContent = '0';
+    comboChip.classList.remove('hot');
+    particles = []; hitTexts = []; shake = 0; currentPower = 0;
+  });
+
+  // ---------- drawing ----------
+  function drawChain(){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200,200,215,0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for(let i=0;i<points.length-1;i++){
+      ctx.moveTo(points[i].x, points[i].y);
+      ctx.lineTo(points[i+1].x, points[i+1].y);
+    }
+    ctx.stroke();
+    for(let i=0;i<points.length-1;i++){
+      ctx.beginPath();
+      ctx.arc(points[i].x, points[i].y, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = '#cfd2e0';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBag(){
+    const bag = bagPoint();
+    const prev = prevPoint();
+    bagRotation = Math.atan2(bag.y-prev.y, bag.x-prev.x) - Math.PI/2;
+
+    // spring squash/stretch back to normal
+    bagScaleX += (1-bagScaleX)*0.15;
+    bagScaleY += (1-bagScaleY)*0.15;
+
+    ctx.save();
+    ctx.translate(bag.x, bag.y);
+    ctx.rotate(bagRotation);
+    ctx.scale(bagScaleX, bagScaleY);
+
+    // shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 10;
+    ctx.beginPath();
+    ctx.arc(0,0,bagRadius,0,Math.PI*2);
+    ctx.fillStyle = '#7a1f2b';
+    ctx.fill();
+    ctx.restore();
+
+    // leather gradient base
+    const grad = ctx.createRadialGradient(-bagRadius*0.3,-bagRadius*0.35, bagRadius*0.15, 0,0, bagRadius);
+    grad.addColorStop(0, '#c73a4a');
+    grad.addColorStop(1, '#7d1522');
+    ctx.beginPath();
+    ctx.arc(0,0,bagRadius,0,Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // photo, clipped to circle
+    if(bagImage){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0,0,bagRadius*0.86,0,Math.PI*2);
+      ctx.clip();
+      const iw = bagImage.width, ih = bagImage.height;
+      const scale = Math.max((bagRadius*1.72)/iw, (bagRadius*1.72)/ih);
+      const dw = iw*scale, dh = ih*scale;
+      ctx.drawImage(bagImage, -dw/2, -dh/2, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.font = `${bagRadius*0.7}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🥊', 0, bagRadius*0.05);
+    }
+
+    // seam lines for a boxing-bag look
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = '#2a0a10';
+    ctx.lineWidth = Math.max(2, bagRadius*0.04);
+    for(const off of [-0.5, 0, 0.5]){
+      ctx.beginPath();
+      ctx.ellipse(0,0, bagRadius*0.98, bagRadius*0.98, 0, Math.PI*0.15+off, Math.PI*0.85+off);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // top cap / strap
+    ctx.beginPath();
+    ctx.ellipse(0,-bagRadius*0.92, bagRadius*0.34, bagRadius*0.14, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#3a3a44';
+    ctx.fill();
+
+    // highlight
+    ctx.beginPath();
+    ctx.ellipse(-bagRadius*0.32,-bagRadius*0.35, bagRadius*0.22, bagRadius*0.12, -0.5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawParticles(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+      p.life -= p.decay;
+      if(p.life<=0){ particles.splice(i,1); continue; }
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);
+      ctx.fillStyle = `hsla(${p.hue}, 90%, 60%, ${p.life})`;
+      ctx.fill();
+    }
+  }
+
+  function drawHitTexts(){
+    ctx.save();
+    ctx.textAlign = 'center';
+    for(let i=hitTexts.length-1;i>=0;i--){
+      const h = hitTexts[i];
+      h.y += h.vy;
+      h.life -= 0.02;
+      if(h.life<=0){ hitTexts.splice(i,1); continue; }
+      ctx.globalAlpha = Math.max(0, h.life);
+      ctx.font = '800 24px -apple-system, sans-serif';
+      ctx.fillStyle = '#ffd23f';
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(h.text, h.x, h.y);
+      ctx.fillText(h.text, h.x, h.y);
+    }
+    ctx.restore();
+  }
+
+  function drawFistCursor(){
+    if(!pointerDown) return;
+    ctx.save();
+    ctx.font = '28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🥊', curX, curY);
+    ctx.restore();
+  }
+
+  // ---------- main loop ----------
+  let lastT = performance.now();
+  function frame(now){
+    const dt = Math.min(0.032, (now-lastT)/1000);
+    lastT = now;
+
+    // punch detection via frame-to-frame pointer speed
+    if(pointerDown){
+      const fdx = curX-prevFrameX, fdy = curY-prevFrameY;
+      const speed = Math.hypot(fdx,fdy);
+      const bag = bagPoint();
+      const distToBag = Math.hypot(curX-bag.x, curY-bag.y);
+      if(speed > SPEED_THRESHOLD && distToBag < bagRadius*1.5 && now-lastPunchT>PUNCH_COOLDOWN){
+        const forceMul = 0.9;
+        registerPunch(curX, curY, fdx*forceMul, fdy*forceMul, speed);
+      }
+      prevFrameX = curX; prevFrameY = curY;
+    }
+
+    integrate(dt);
+    satisfyConstraints();
+
+    // power meter reflects current bag speed
+    const bag = bagPoint();
+    const bagSpeed = Math.hypot(bag.x-bag.oldx, bag.y-bag.oldy);
+    currentPower += ((Math.min(100,bagSpeed*9)) - currentPower) * 0.2;
+    powerFill.style.width = Math.max(0,Math.min(100,currentPower)) + '%';
+
+    // combo decay
+    if(combo>0 && now-comboTimer > COMBO_WINDOW){
+      combo = 0;
+      comboVal.textContent = '0';
+      comboChip.classList.remove('hot');
+    }
+
+    shake *= 0.88;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if(shake>0.3){
+      ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    }
+    drawChain();
+    drawBag();
+    drawParticles(dt);
+    drawHitTexts();
+    drawFistCursor();
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(frame);
+
+  // dismiss intro on first interaction anywhere
+  stage.addEventListener('pointerdown', hideIntro, {once:true});
+})();
+</script>
+</body>
+</html>
